@@ -3,14 +3,14 @@
 
 OBJC_RUNTIME_LIB=ng
 
-#include $(GNUSTEP_MAKEFILES)/common.make
+include $(GNUSTEP_MAKEFILES)/common.make
 
 FRAMEWORK_NAME = stsh
 
-GNUSTEP_LOCAL_ADDITIONAL_MAKEFILES=base.make
+# GNUSTEP_LOCAL_ADDITIONAL_MAKEFILES=base.make
 GNUSTEP_BUILD_DIR = ~/Build
 
-include $(GNUSTEP_MAKEFILES)/common.make
+# include $(GNUSTEP_MAKEFILES)/common.make
 
 
 LIBRARY_NAME = libstsh
@@ -19,10 +19,10 @@ LIBRARY_NAME = libstsh
 OBJCFLAGS += -g -Os -Wno-import 
 
 
-stsh_HEADER_FILES = \
+libstsh_HEADER_FILES = \
 
 
-stsh_HEADER_FILES_INSTALL_DIR = /stsh
+libstsh_HEADER_FILES_INSTALL_DIR = /stsh
 
 
 libstsh_OBJC_FILES = \
@@ -56,7 +56,7 @@ include $(GNUSTEP_MAKEFILES)/library.make
 -include GNUmakefile.postamble
 
 before-all ::
-	
+
 #	@$(MKDIRS) $(libMPWFoundation_HEADER_FILES_DIR)
 #	cp *.h $(libMPWFoundation_HEADER_FILES_DIR)
 #	cp Collections.subproj/*.h $(libMPWFoundation_HEADER_FILES_DIR)
