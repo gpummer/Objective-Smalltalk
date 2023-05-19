@@ -11,7 +11,7 @@
 
 @implementation MPWRecursiveIdentifier
 
-objectAccessor( MPWIdentifier, nextIdentifier, setNextIdentifier )
+objectAccessor(MPWIdentifier*, nextIdentifier, setNextIdentifier )
 
 -resolveRescursiveIdentifierWithContext:aContext
 {
@@ -23,6 +23,12 @@ objectAccessor( MPWIdentifier, nextIdentifier, setNextIdentifier )
 -(NSString*)path
 {
     return self.nextIdentifier.path;
+}
+
+-(NSString *)description
+{
+    return [NSString stringWithFormat:@"<%@:%p: schemeName: %@ identifierName: %@ nextIdentifier: %@>",
+            [self class],self,[self schemeName],[self identifierName],[self nextIdentifier]];
 }
 
 

@@ -1,0 +1,12 @@
+#!env st
+#-<void>compileToFramework:source
+framework:ObjSTNative load.
+basename := source stringValue stringByDeletingPathExtension.
+compiler := STNativeCompiler compiler.
+compiled := compiler compileClassToMachoO: (compiler compile: file:{source}).
+objectFileName := basename , '.o'.
+fwkName := "{basename}.framework".
+ref:file:. mkdir:fwkName.
+binaryName := "{fwkName}/{basename}".
+file:{objectFileName} := compiled.
+compiler linkObjects: #[ basename ] toSharedLibrary: binaryName inDir: nil withFrameworks:[ 'ObjectiveHttpd', 'ObjectiveSmalltalk', 'MPWFoundation', 'Foundation' ].

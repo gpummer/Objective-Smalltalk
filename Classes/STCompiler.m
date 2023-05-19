@@ -38,6 +38,7 @@
 #import "MPWBidirectionalDataflowConstraintExpression.h"
 #import "STTypeDescriptor.h"
 #import "STSubscriptExpression.h"
+#import "STPortScheme.h"
 
 @class MPWClassMethodStore;
 
@@ -75,9 +76,9 @@
 @implementation STCompiler
 
 
-objectAccessor( NSMutableDictionary, symbolTable, setSymbolTable)
-objectAccessor( MPWStScanner, scanner, setScanner )
-objectAccessor( MPWMethodStore, methodStore, setMethodStore )
+objectAccessor(NSMutableDictionary*, symbolTable, setSymbolTable)
+objectAccessor(MPWStScanner*, scanner, setScanner )
+objectAccessor(MPWMethodStore*, methodStore, setMethodStore )
 idAccessor( connectorMap, setConnectorMap );
 idAccessor(solver, setSolver)
 
@@ -167,24 +168,6 @@ idAccessor(solver, setSolver)
 
 
 #pragma mark Evaluator
-
--(MPWSchemeScheme*)createSchemes
-{
-	MPWSchemeScheme* schemes=[super createSchemes];
-	[schemes setSchemeHandler:[MPWDefaultsScheme store]  forSchemeName:@"defaults"];
-	[schemes setSchemeHandler:[MPWFileSchemeResolver store]  forSchemeName:@"file"];
-	[schemes setSchemeHandler:[MPWURLSchemeResolver httpScheme]  forSchemeName:@"http"];
-	[schemes setSchemeHandler:[MPWURLSchemeResolver httpsScheme]  forSchemeName:@"https"];
-    [schemes setSchemeHandler:[[[MPWURLSchemeResolver alloc] initWithSchemePrefix:@"ftp"  ]  autorelease] forSchemeName:@"ftp"];
-    
-	[schemes setSchemeHandler:[MPWEnvScheme store]  forSchemeName:@"env"];
-	[schemes setSchemeHandler:[MPWBundleScheme store]  forSchemeName:@"bundle"];
-	[schemes setSchemeHandler:[MPWBundleScheme mainBundleScheme]  forSchemeName:@"mainbundle"];
-//	[schemes setSchemeHandler:[MPWScriptingBridgeScheme scheme]  forSchemeName:@"app"];
-	
-	return schemes;
-}
-
 
 
 
@@ -295,7 +278,7 @@ idAccessor(solver, setSolver)
 //                NSLog(@"closing bracket, exit loop");
                 break;
             } else {
-                PARSEERROR(@"array syntax expr not followed by , or )", @"");
+                PARSEERROR(@"array syntax expr not followed by , or ]", @"");
             }
         } else {
             break;
@@ -420,7 +403,7 @@ idAccessor(solver, setSolver)
 	MPWIdentifier *identifier=[[[MPWIdentifier alloc] init] autorelease];
 	MPWIdentifier *identifierToAddNameTo=identifier;
 	NSString *scheme=[aToken stringValue];
-    [variable setOffset:[scanner offset]];
+    [variable setTextOffset:[scanner offset]];
     [variable setLen:1];
 	scheme=[scheme substringToIndex:[scheme length]-1];
 	NSString* name;
@@ -497,7 +480,7 @@ idAccessor(solver, setSolver)
 -makeLocalVar:aToken
 {
 	MPWIdentifierExpression* variable=[[[MPWIdentifierExpression alloc] init] autorelease];
-    [variable setOffset:[scanner offset]];
+    [variable setTextOffset:[scanner offset]];
     [variable setLen:1];
 	MPWIdentifier *identifier=[[[MPWIdentifier alloc] init] autorelease];
 	NSString* name = [aToken stringValue];
@@ -588,7 +571,7 @@ idAccessor(solver, setSolver)
 //	NSAssert1( [closeBrace isEqual:@"]"], @"'[' not followed by ']': '%@'",closeBrace);
 	id expr = [MPWBlockExpression blockWithStatements:statements arguments:blockVariables];
 //    NSLog(@"closeBrace: %@",closeBrace);
-    [expr setOffset:[scanner offset]];
+    [expr setTextOffset:[scanner offset]];
     [expr setLen:1];
     if ( ![closeBrace isEqual:endOfBlock] ) {
         NSString *s=[NSString stringWithFormat:@"block not closed by matching '%@' got '%@' instead",endOfBlock,closeBrace];
@@ -670,23 +653,31 @@ idAccessor(solver, setSolver)
     return sel;
 }
 
+
 -parseUnary
 {
 //    NSLog(@"parseUnary");
     id expr=[self parseArgument];
 //    NSLog(@"argument: %@",expr);
   id next=nil;
-    while ( nil!=(next=[self nextToken]) && ![next isLiteral] && ![next isKeyword] && ![next isBinary] && ![next isEqual:@")"] && ![next isEqual:@"."] &&![next isEqual:@";"] &&![next isEqual:@"|"] && ![next isEqual:@"]"]) {
+    while ( nil!=(next=[self nextToken]) && ![next isLiteral] && ![next isKeyword] && ![next isBinary] && ![next isEqual:@")"] && ![next isEqual:@"."] &&![next isEqual:@";"] &&![next isEqual:@"|"] && ![next isEqual:@"]"]&& ![next isEqual:@"["]) {
 //        NSLog(@"part of parseUnary, token: %@",next);
         expr=[[MPWMessageExpression alloc] initWithReceiver:expr];
-        [expr setOffset:[scanner offset]];
+        [expr setTextOffset:[scanner offset]];
         [expr setLen:1];
+        NSAssert1( ![next isEqual:@"["],@"selector shouldn't be open bracket: %@",next);
         [expr setSelector:[self mapSelectorString:next]];
 		expr=[self mapConnector:expr];
 //        NSLog(@"part of parseUnary: %@",expr);
     }
     if ( next ) {
-        [self pushBack:next];
+        if ( [next isEqual:@"["]) {
+//            PARSEERROR(@"got a [ in parseUnary", next);
+//            [self pushBack:next];
+            expr =  [self parseSubscriptExpression:expr];
+        } else {
+            [self pushBack:next];
+        }
     }
 //    NSLog(@"parseUnary -> %@",expr);
     return expr;
@@ -701,6 +692,7 @@ idAccessor(solver, setSolver)
 
     if ( selector && isalpha( [selector characterAtIndex:0] )) {
 //        NSLog(@"possibly keyword: '%@'",selector);
+        NSAssert1( ![selector isEqual:@"["],@"selector shouldn't be open bracket: %@",selector);
         BOOL isKeyword =[selector isKeyword];
         if ( isKeyword   ) {
             args=[NSMutableArray array];
@@ -727,7 +719,7 @@ idAccessor(solver, setSolver)
                     if ( [self isSpecialSelector:keyword] ) {
 //                        NSLog(@"special selector '%@' encountered, parsing subexpression",keyword);
                         id subExpr = [[[MPWMessageExpression alloc] initWithReceiver:arg] autorelease];
-                        [subExpr setOffset:[scanner offset]];
+                        [subExpr setTextOffset:[scanner offset]];
                         [subExpr setLen:1];
                         [self parseSelectorAndArgs:subExpr];
 						subExpr=[self mapConnector:subExpr];
@@ -756,10 +748,14 @@ idAccessor(solver, setSolver)
             [selector isEqual:@"|="]) {
             PARSEERROR(@"unexpected", selector);
         } else if ([selector isEqualToString:@":"]){
-//            NSLog(@"single ':' as selector");
+            //            NSLog(@"single ':' as selector");
             [self pushBack:selector];
             return [expr receiver];
         } else {
+            if ( [selector isEqual:@"["]) {
+                NSLog(@"selector shouldn't be open bracket:\%@",[NSThread callStackSymbols]);
+                PARSEERROR(@"selector shouldn't be open bracket", selector);
+            }
 //            NSLog(@"binary: %@",selector);
             id arg=[self parseUnary];
 //            NSLog(@"arg to binary: %@",arg);
@@ -772,6 +768,7 @@ idAccessor(solver, setSolver)
 //		NSLog(@"parse unary: selector=%@ args=%@",selector, args);
     }
 //	NSLog(@"got selector: %@ args: %@",selector,args);
+    NSAssert1( ![selector isEqual:@"["],@"selector shouldn't be open bracket: %@",selector);
     [expr setSelector:[self mapSelectorString:selector]];
     [expr setArgs:args];
 //    NSLog(@"return expr from parseSelectorAndArgs: %@",expr);
@@ -792,15 +789,9 @@ idAccessor(solver, setSolver)
     id next;
     id prev=nil;
     while ( nil!=(next=[self nextToken]) && ![next isEqual:@"."] &&![next isEqual:@";"] &&![next isEqual:@"|"] && ![next isEqual:@")"]&& ![next isEqual:@"]"]&& ![next isEqual:@"}"] && ![next isEqual:@"#"]) {
-        BOOL isSuper=NO;
         [self pushBack:next];
-        if ( [expr respondsToSelector:@selector(name)] && [[expr name] isEqual:@"super"]) {
-            expr=@"self";
-            isSuper=YES;
-        }
         expr=[[[MPWMessageExpression alloc] initWithReceiver:expr] autorelease];
-        ((MPWMessageExpression*)expr).isSuper=isSuper;
-        [expr setOffset:[scanner offset]];
+        [expr setTextOffset:[scanner offset]];
         [expr setLen:1];
 //		NSLog(@"message expression with scanner: %@",scanner);
         expr=[self parseSelectorAndArgs:expr];
@@ -829,7 +820,7 @@ idAccessor(solver, setSolver)
         
         id expr=[[[MPWMessageExpression alloc] initWithReceiver:firstExpression] autorelease];
 //            NSLog(@"next expr start: %@",expr);
-        [expr setOffset:[scanner offset]];
+        [expr setTextOffset:[scanner offset]];
         [expr setLen:1];
 //            NSLog(@"parse cascade");
         [self parseSelectorAndArgs:expr];
@@ -855,7 +846,7 @@ idAccessor(solver, setSolver)
         }
         id expr=[[[MPWMessageExpression alloc] initWithReceiver:[firstExpression receiver]] autorelease];
         //            NSLog(@"next expr start: %@",expr);
-        [expr setOffset:[scanner offset]];
+        [expr setTextOffset:[scanner offset]];
         [expr setLen:1];
         //            NSLog(@"parse cascade");
         [self parseSelectorAndArgs:expr];
@@ -891,7 +882,7 @@ idAccessor(solver, setSolver)
 {
 	id rhs = [self parseExpression];
     id assignment = [[[assignmentExpressionClass alloc] init] autorelease];
-    [assignment setOffset:[scanner offset]];
+    [assignment setTextOffset:[scanner offset]];
     [assignment setLen:1];
 //	NSLog(@"have assignment of first: %@",first,assignment);
 	[assignment setLhs:lhs];
@@ -916,7 +907,20 @@ idAccessor(solver, setSolver)
 	return [self connectorClassForToken:aToken];
 }
 
-
+-parseSubscriptExpression:first
+{
+    STExpression* indexExpr=[self parseExpression];
+    id closeBrace=[self nextToken];
+    if ( [closeBrace isEqual:@"]"]) {
+        STSubscriptExpression *expr=[[STSubscriptExpression new] autorelease];
+        expr.receiver=first;
+        expr.subscript=indexExpr;
+        first=expr;
+    } else {
+        PARSEERROR(@"indexExpression not closed by ']'", closeBrace);
+    }
+    return first;
+}
 
 -parseExpressionInLiteral:(BOOL)inLiteral
 {
@@ -948,16 +952,7 @@ idAccessor(solver, setSolver)
         second = [self nextToken];
     }
     if ( [second isEqual:@"["]) {
-        MPWExpression* indexExpr=[self parseExpression];
-        id closeBrace=[self nextToken];
-        if ( [closeBrace isEqual:@"]"]) {
-            STSubscriptExpression *expr=[[STSubscriptExpression new] autorelease];
-            expr.receiver=first;
-            expr.subscript=indexExpr;
-            first=expr;
-        } else {
-            PARSEERROR(@"indexExpression not closed by ']'", closeBrace);
-        }
+        first = [self parseSubscriptExpression:first];
         second = [self nextToken];
         if ([self isAssignmentLikeToken:second] ) {
             return [self parseAssignmentLikeExpression:first withExpressionClass:[self connectorClassForToken:second]];
@@ -1499,6 +1494,21 @@ idAccessor(solver, setSolver)
 	return [self bindingForIdentifier:identifier];
 }
 
+-(void)defineMethodsForClassDefinition:(MPWClassDefinition*)classDefinition
+{
+    MPWClassMethodStore* store= [self classStoreForName:classDefinition.name];
+    for ( MPWScriptedMethod *method in [classDefinition allMethods]) {
+        [store installMethod:method];
+    }
+    if ( classDefinition.classMethods.count) {
+        for ( MPWScriptedMethod *method in [classDefinition classMethods]) {
+            [store installClassMethod:method];
+        }
+    }
+}
+
+
+
 -(void)dealloc
 {
     [tokens release];
@@ -1686,6 +1696,18 @@ idAccessor(solver, setSolver)
     IDEXPECT( result, @(16), @"square-bracket array access as start of expression");
 }
 
++(void)testHexLiteral
+{
+    IDEXPECT( [self evaluate:@"0xff"], @(255), @"hex constant");
+    IDEXPECT( [self evaluate:@"0x1a"], @(26), @"hex constant");
+}
+
++(void)testBinaryLiteral
+{
+    IDEXPECT( [self evaluate:@"0b1001"], @(9), @"binary constant");
+    IDEXPECT( [self evaluate:@"0b1111"], @(15), @"binary constant");
+}
+
 +testSelectors
 {
     return @[ @"testCheckValidSyntax" ,
@@ -1707,6 +1729,8 @@ idAccessor(solver, setSolver)
               @"testSquareBracketLiteralArraysCanHaveCustomClasses",
               @"testCanAccessArraysWithSquareBrackets",
               @"testArrayAccessDoesNotStopEvaluation",
+              @"testHexLiteral",
+              @"testBinaryLiteral",
     ];
 }
 
@@ -1723,3 +1747,10 @@ idAccessor(solver, setSolver)
 
 
 @end
+
+
+id objs_get_scheme_reference(NSString *schemeName, NSString *reference )
+{
+    return [(MPWScheme*)[[MPWSchemeScheme currentScheme] at:schemeName] get:reference];
+}
+

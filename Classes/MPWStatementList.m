@@ -7,17 +7,25 @@
 //
 
 #import "MPWStatementList.h"
-#import "MPWEvaluator.h"
+#import "STEvaluator.h"
 #import "MPWObjCGenerator.h"
 
 @implementation MPWStatementList
 
-idAccessor( statements, setStatements )
+objectAccessor( NSMutableArray*, statements, setStatements )
 
 +statementList
 {
 	return [[[self alloc] init] autorelease];
 }
+
+-(void)accumulateLocalVars:(NSMutableArray*)vars
+{
+    for (STExpression *statement in statements) {
+        [statement accumulateLocalVars:vars];
+    }
+}
+
 
 -init
 {
@@ -64,6 +72,13 @@ idAccessor( statements, setStatements )
 -compileIn:aContext
 {
 	return self;
+}
+
+-(void)accumulateBlocks:(NSMutableArray*)blocks
+{
+    for ( id statement in [self statements] ) {
+        [statement accumulateBlocks:blocks];
+    }
 }
 
 -(NSString *)description

@@ -9,6 +9,7 @@
 #import "MPWPropertyPathDefinition.h"
 #import "MPWPropertyPath.h"
 #import "MPWClassDefinition.h"
+#import "MPWStTests.h"
 
 @implementation MPWStPropertyPathTests
 
@@ -112,7 +113,7 @@
 +(void)testEvaluatePropertyPathGetterWithWildcard
 {
     STCompiler *compiler=[STCompiler compiler];
-    [compiler evaluateScriptString:@"class PropertyTestClass4 : MPWScheme { /propertyA/*:path { |= {  path   reverseObjectEnumerator allObjects componentsJoinedByString:':'. }}} "];
+    [compiler evaluateScriptString:@"class PropertyTestClass4 : MPWScheme { /propertyA/*:path { |= {  (path componentsSeparatedByString:'/')  reverseObjectEnumerator allObjects componentsJoinedByString:':'. }}} "];
     id result1 = [compiler evaluateScriptString:@"a := PropertyTestClass4 scheme. scheme:p := a. p:propertyA/a/b/c."];
     IDEXPECT(result1,@"c:b:a",@"evaluating a wildcard property with 3 args");
 }
@@ -162,8 +163,14 @@
     [compiler evaluateScriptString:@"scheme:m := PropertyTestClass9 storeWithSource: scheme:d."];
     [compiler evaluateScriptString:@"d:a := 3."];
     IDEXPECT( [compiler evaluateScriptString:@"m:a"],@(3),@"dict via mapping store subclass that doesn't define getter");
+}
 
-
++(void)testPropertyPathWildcardMatchesRoot
+{
+    STCompiler *compiler=[STCompiler compiler];
+    [compiler evaluateScriptString:@"scheme PropertyTestClass11  {  /* { |= { 'hello' }}} "];
+    [compiler evaluateScriptString:@"scheme:s := PropertyTestClass11 store."];
+    IDEXPECT( [compiler evaluateScriptString:@" s:/ "],@"hello",@"root should be matched by wildcard");
 }
 
 +(NSArray*)testSelectors
@@ -187,6 +194,7 @@
        @"testPropertyPathGetterWithArgsWorksWithPlainClass",
        @"testSimplePropertyPathSetterWorksWithPlainClass",
        @"testDefiningNoPropertyPathGettersAllowsSuperclassDefinitionToPrevail",
+       @"testPropertyPathWildcardMatchesRoot",
 
 			];
 }

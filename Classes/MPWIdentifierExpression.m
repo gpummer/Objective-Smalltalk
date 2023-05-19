@@ -7,18 +7,23 @@
 //
 
 #import "MPWIdentifierExpression.h"
-#import "MPWEvaluator.h"
+#import "STEvaluator.h"
 #import "MPWObjCGenerator.h"
 #import "MPWIdentifier.h"
 
 @implementation MPWIdentifierExpression
 
-objectAccessor( MPWIdentifier, identifier, setIdentifier )
+objectAccessor(MPWIdentifier*, identifier, setIdentifier )
 idAccessor( evaluationEnvironment, setEvaluationEnvironment )
 
 -scheme
 {
 	return [[self identifier] schemeName];
+}
+
+-(BOOL)isSuper
+{
+    return [[self name] isEqual:@"super"];
 }
 
 -name

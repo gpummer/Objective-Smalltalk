@@ -41,9 +41,9 @@ boolAccessor( doLines , setDoLines )
 	return fullPath;
 }
 
-objectAccessor( NSString, name, setName )
-objectAccessor( NSMutableArray, arguments, setArguments )
-objectAccessor( NSTask, task, setTask )
+objectAccessor(NSString*, name, setName )
+objectAccessor(NSMutableArray*, arguments, setArguments )
+objectAccessor(NSTask*, task, setTask )
 
 +processWithName:(NSString*)aName
 {
@@ -132,12 +132,13 @@ objectAccessor( NSTask, task, setTask )
 }
 
 
--runProcess
+
+-runWithTarget:newTarget
 {
 	id filter=[self wrappedAsMPWStream];
-	[filter setTarget:[NSMutableArray array]];
+	[filter setTarget:newTarget];
 //	[filter runProcess];
-	[filter close];
+	[filter run];
 	return [filter target];
 #if 0
 	id commandFilter = [[[MPWCommandFilter 
@@ -149,6 +150,11 @@ objectAccessor( NSTask, task, setTask )
     [self configureProcessForRunningWithStdinput:nil stdoutput:pipe];
     return [self resultOfRunning:readHandleOfPipe];
 #endif	
+}
+
+-runProcess
+{
+    return [self runWithTarget:[NSMutableArray array]];
 }
 
 

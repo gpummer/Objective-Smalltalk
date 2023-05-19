@@ -6,13 +6,13 @@
 //  Copyright (c) 2001 Marcel Weiher. All rights reserved.
 //
 
-#import <ObjectiveSmalltalk/MPWExpression.h>
+#import <ObjectiveSmalltalk/STExpression.h>
 
 @class MPWIdentifier;
 
 
 
-@interface MPWIdentifierExpression : MPWExpression {
+@interface MPWIdentifierExpression : STExpression {
 	id	evaluationEnvironment;
 	MPWIdentifier*  identifier;
 }
@@ -20,7 +20,7 @@
 //idAccessor_h( name, setName )
 //idAccessor_h( scheme, setScheme )
 idAccessor_h( evaluationEnvironment, setEvaluationEnvironment )
-objectAccessor_h( MPWIdentifier, identifier, setIdentifier )
+objectAccessor_h(MPWIdentifier*, identifier, setIdentifier )
 -evaluateAssignmentOf:value in:aContext;
 
 -scheme;

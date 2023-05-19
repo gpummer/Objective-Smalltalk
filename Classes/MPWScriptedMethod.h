@@ -8,17 +8,18 @@
 
 #import <ObjectiveSmalltalk/MPWAbstractInterpretedMethod.h>
 
-@class MPWMethodHeader;
+@class MPWMethodHeader,MPWBlockExpression;
 
 @interface MPWScriptedMethod : MPWAbstractInterpretedMethod {
 	id					script;
-	MPWExpression*		methodBody;
-	NSArray*			localVars;
+	STExpression*		methodBody;
+    NSArray*			localVars;
 	id					contextClass;
 }
 
-objectAccessor_h( MPWExpression, methodBody, setMethodBody )
-objectAccessor_h( NSArray, localVars, setLocalVars )
+objectAccessor_h(STExpression*, methodBody, setMethodBody )
+objectAccessor_h(NSArray*, localVars, setLocalVars )
+@property (readonly, nonatomic) NSArray <MPWBlockExpression*>* blocks;
 idAccessor_h( script, setScript )
 
 @property (nonatomic,assign) Class classOfMethod;
@@ -30,7 +31,7 @@ idAccessor_h( script, setScript )
 
 -(NSMutableArray*)scriptStackTrace;
 
-objectAccessor_h( NSMutableArray, combinedStackTrace, setCombinedStackTrace)
+objectAccessor_h(NSMutableArray*, combinedStackTrace, setCombinedStackTrace)
 //-(NSMutableArray*)combinedStackTrace;
 //-(void)setCombined
 -(void)addCombinedFrame:(NSString*)frame frameToReplace:original previousTrace:previousTrace;

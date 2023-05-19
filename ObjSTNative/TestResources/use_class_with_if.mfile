@@ -1,0 +1,24 @@
+
+#import <ObjectiveSmalltalk/ObjectiveSmalltalk.h>
+
+@interface TestClassIfTrueIfFalse : NSObject {}
+-tester:cond;
+@end
+
+
+int main(void) {
+    [MPWBlock new];
+    [MPWBlockContext class];
+    id tester = [TestClassIfTrueIfFalse new];
+    NSLog(@"tester: %@",tester);
+    id trueObject=@(true);
+    id falseObject=@(false);
+    NSLog(@"true: %@",[tester tester:trueObject]);
+    NSLog(@"false: %@",[tester tester:falseObject]);
+    if ([[tester tester:@(true)] isEqual:@(3)] &&
+        [[tester tester:@(false)] isEqual:@(2)]) {
+        return 0;
+    } else {
+        return 1;
+    }
+}

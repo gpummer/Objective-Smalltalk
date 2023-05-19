@@ -1,0 +1,11 @@
+#!/usr/local/bin/stsh
+#-homeserver
+framework:ObjectiveHTTPD load.
+server := MPWSchemeHttpServer new.
+server server setPort:8088.
+base := ref:file:{env:HOME}/Sites asScheme.
+cache := base cachedBy: MPWSiteMap scheme.
+
+server setScheme: cache .
+
+server.

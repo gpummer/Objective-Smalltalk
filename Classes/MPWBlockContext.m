@@ -8,7 +8,7 @@
 
 #import "MPWBlockContext.h"
 #import "MPWStatementList.h"
-#import "MPWEvaluator.h"
+#import "STEvaluator.h"
 #import "STCompiler.h"
 #import <MPWFoundation/MPWMapFilter.h>
 #import "MPWBindingLegacy.h"
@@ -30,8 +30,40 @@
 idAccessor( block, setBlock )
 idAccessor( context, setContext )
 
+typedef id (^SevenArgBlock)(id arg1, id arg2,id arg3, id arg4,id arg5 ,id arg6 ,id arg7);
+typedef id (^SixArgBlock)(id arg1, id arg2,id arg3, id arg4, id arg5 ,id arg6 );
+typedef id (^FiveArgBlock)(id arg1, id arg2,id arg3, id arg4, id arg5  );
+typedef id (^FourArgBlock)(id arg1, id arg2,id arg3 , id arg4 );
+typedef id (^ThreeArgBlock)(id arg1, id arg2,id arg3 );
+typedef id (^TwoArgBlock)(id arg1, id arg2);
 typedef id (^OneArgBlock)(id randomArgument);
 typedef id (^ZeroArgBlock)(void);
+
+typedef id (^ArrayArgBlock)(id blockSelf, NSArray* argsArray);
+
+
+static ArrayArgBlock valueWithArgsBlock = (id)^(id blockSelf, NSArray *a){
+//    NSLog(@"args: %@",a);
+    switch (a.count ) {
+        case 0:
+            return ((ZeroArgBlock)blockSelf)();
+        case 1:
+            return ((OneArgBlock)blockSelf)( a[0]);
+        case 2:
+            return ((TwoArgBlock)blockSelf)( a[0],a[1]);
+        case 3:
+            return ((ThreeArgBlock)blockSelf)( a[0],a[1],a[2]);
+        case 4:
+            return ((FourArgBlock)blockSelf)( a[0],a[1],a[2],a[3]);
+        case 5:
+            return ((FiveArgBlock)blockSelf)( a[0],a[1],a[2],a[3],a[4]);
+        case 6:
+            return ((SixArgBlock)blockSelf)( a[0],a[1],a[2],a[3],a[4],a[5]);
+        default:
+//            NSLog(@"blocks with %d args not supported",(int)a.count);
+            return ((SixArgBlock)blockSelf)( a[0],a[1],a[2],a[3],a[4],a[5]);
+    }
+};
 
 +(void)initialize
 {
@@ -42,6 +74,8 @@ typedef id (^ZeroArgBlock)(void);
         class_addMethod(blockClass, @selector(value:), oneArgImp, "@@:@");
         IMP zeroArgImp=imp_implementationWithBlock( ^(id blockSelf){ ((ZeroArgBlock)blockSelf)(); } );
         class_addMethod(blockClass, @selector(value), zeroArgImp, "@@:");
+        IMP varArgImp=imp_implementationWithBlock( valueWithArgsBlock );
+        class_addMethod(blockClass, @selector(valueWithObjects:), varArgImp, "@@:@");
         initialized=YES;
     }
 }
@@ -74,7 +108,7 @@ typedef id (^ZeroArgBlock)(void);
 -freshExecutionContextForRealLocalVars
 {
     //    NSLog(@"creating new context from context: %@",[self context]);
-    MPWEvaluator *evalContext= [[[[self contextClass] alloc] initWithParent:[self context]] autorelease];
+    STEvaluator *evalContext= [[[[self contextClass] alloc] initWithParent:[self context]] autorelease];
 
     
     return evalContext;
@@ -85,7 +119,7 @@ typedef id (^ZeroArgBlock)(void);
 #if 0
     return [self context];
 #else
-    MPWEvaluator *evalContext=[self freshExecutionContextForRealLocalVars];
+    STEvaluator *evalContext=[self freshExecutionContextForRealLocalVars];
     return evalContext;
 #endif
 }
@@ -249,7 +283,7 @@ typedef id (^ZeroArgBlock)(void);
 
 @end
 
-@implementation MPWEvaluator(autorelease)
+@implementation STEvaluator(autorelease)
 
 -(void)autoreleased:(ZeroArgBlock)block
 {
@@ -385,7 +419,7 @@ typedef id  (^idBlock)(id arg );
 {
     MPWBlockContext *stblock = [STCompiler evaluate:@"{ 42. }"];
     [stblock installInClass:[NSNumber class] withSignature:"i@:" selector:@selector(theIntAnswer)];
-    NSLog(@"=== should convert to int");
+//    NSLog(@"=== should convert to int");
     int theAnswer=[@(2) theIntAnswer];
     INTEXPECT(theAnswer, 42, @"theAnswer");
 }

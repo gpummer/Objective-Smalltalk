@@ -8,6 +8,7 @@
 #import "STBundle.h"
 #import "STCompiler.h"
 #import "MPWSchemeScheme.h"
+#import "MPWMethodStore.h"
 
 @interface STBundle()
 
@@ -23,17 +24,20 @@
     STCompiler     *interpreter;
     NSDictionary      *methodDict;
     MPWWriteBackCache *cachedResources;
+    MPWWriteBackCache *cachedSources;
 }
 
-lazyAccessor(NSDictionary, info, setInfo, readInfo)
-lazyAccessor(STCompiler, interpreter, setInterpreter, createInterpreter)
-lazyAccessor(NSDictionary, methodDict, setMethodDict, methodDictForSourceFiles)
-lazyAccessor(MPWWriteBackCache, cachedResources, setCachedResources, createResources)
+lazyAccessor(NSDictionary*, info, setInfo, readInfo)
+lazyAccessor(STCompiler*, interpreter, setInterpreter, createInterpreter)
+lazyAccessor(NSDictionary*, methodDict, setMethodDict, methodDictForSourceFiles)
+lazyAccessor(MPWWriteBackCache*, cachedResources, setCachedResources, createCachedResources)
+lazyAccessor(MPWWriteBackCache*, cachedSources, setCachedSources, createCachedSources)
 
-CONVENIENCEANDINIT( binding, WithBinding:newBinding )
+CONVENIENCEANDINIT( bundle, WithBinding:newBinding )
 {
     self=[super init];
     self.binding=newBinding;
+    self.saveSource = YES;
     return self;
 }
 
@@ -49,15 +53,31 @@ CONVENIENCEANDINIT( bundle, WithPath:(NSString*)newPath )
     return [self.binding path];
 }
 
+-(NSURL*)url
+{
+    return [NSURL fileURLWithPath:self.path];
+}
+
+-(MPWBinding*)refForSubDir:(NSString*)subdir
+{
+    return [[self binding] referenceByAppendingReference:subdir];
+}
+
 -(id <MPWHierarchicalStorage>)storeForSubDir:(NSString*)subdir
 {
-    return [[[self binding] referenceByAppendingReference:subdir] asScheme];
+    return [[self refForSubDir:subdir] asScheme];
 }
 
 -(id <MPWHierarchicalStorage>)resources
 {
     return [self storeForSubDir:@"Resources"];
 }
+
+-(id <MPWHierarchicalStorage>)sourceDir
+{
+    return [self storeForSubDir:@"Sources"];
+}
+
 
 -(BOOL)isPresentOnDisk
 {
@@ -70,29 +90,41 @@ CONVENIENCEANDINIT( bundle, WithPath:(NSString*)newPath )
     }
 }
 
+-(id <MPWReferencing>)sourceRef
+{
+    return [self refForSubDir:@"Sources"];
+//    NSString *path=[[self path] stringByAppendingPathComponent:@"Resources"];
+//    return path;
+}
+
 -(id <MPWReferencing>)resourceRef
 {
     NSString *path=[[self path] stringByAppendingPathComponent:@"Resources"];
     return path;
 }
 
--(MPWWriteBackCache*)createResources
+-(MPWWriteBackCache*)createCachedResources
 {
 
-    MPWDiskStore *base = [MPWDiskStore store];
+    id <MPWStorage,MPWHierarchicalStorage> base = self.resources;
     MPWWriteBackCache *cache=[MPWWriteBackCache storeWithSource:base];
     cache.autoFlush=NO;
     return cache;
 }
 
--(id <MPWHierarchicalStorage>)sourceDir
+-(MPWWriteBackCache*)createCachedSources
 {
-    return [self storeForSubDir:@"Sources"];
+    id <MPWStorage,MPWHierarchicalStorage> base = self.sourceDir;
+    MPWWriteBackCache *cache=[MPWWriteBackCache storeWithSource:base];
+    cache.autoFlush=NO;
+    return cache;
 }
+
 
 -(NSArray<NSString*>*)sourceNames
 {
-    return (NSArray<NSString*>*)[[(NSArray<NSString*>*)[[[[[self sourceDir] at:@"."] contents] collect] path] collect] lastPathComponent];
+    NSArray<NSString*>* allFiles = (NSArray<NSString*>*)[[(NSArray<NSString*>*)[[[[[self sourceDir] at:@"."] contents] collect] path] collect] lastPathComponent];
+    return [[allFiles select] __hasSuffix:@"st"];
 }
 
 -(NSDictionary*)readInfo
@@ -102,7 +134,7 @@ CONVENIENCEANDINIT( bundle, WithPath:(NSString*)newPath )
 
 -(void)configureInterpreter:(STCompiler*)newInterpreter
 {
-    [[newInterpreter schemes] setSchemeHandler:[MPWPathRelativeStore storeWithSource:self.cachedResources reference:[self resourceRef]]   forSchemeName:@"rsrc"];
+    [[newInterpreter schemes] setSchemeHandler:self.cachedResources   forSchemeName:@"rsrc"];
     [newInterpreter bindValue:[MPWByteStream Stdout] toVariableNamed:@"stdout"];
 }
 
@@ -113,20 +145,71 @@ CONVENIENCEANDINIT( bundle, WithPath:(NSString*)newPath )
     return compiler;
 }
 
--(NSDictionary*)methodDictForSourceFiles
+-(id)resultOfCompilingSourceFileNamed:(NSString*)sourceName
 {
-    STCompiler *compiler=self.interpreter;
-    id <MPWHierarchicalStorage> sources=[self sourceDir];
+    id statements=nil;
+    @autoreleasepool {
+        STCompiler *compiler=self.interpreter;
+        id <MPWHierarchicalStorage> sources=[self cachedSources];
+        NSData *stSource = sources[sourceName];
+        statements=[[compiler compile:stSource] retain];
+    }
+    return [statements autorelease];
+}
+
+-(void)compileSourceFile:(NSString*)sourceName
+{
+    @autoreleasepool {
+        [self.interpreter evaluate:[self resultOfCompilingSourceFileNamed:sourceName]];
+    }
+}
+
+-(void)compileAllSourceFiles
+{
     for ( NSString *filename in [self sourceNames] ) {
         @autoreleasepool {
-            NSData *stSource = sources[filename];
-            NSArray *statements=[compiler compile:stSource];
-            [compiler evaluate:statements];
+            [self compileSourceFile:filename];
         }
     }
+}
 
-    NSDictionary *subDict=[compiler externalScriptDict];
-    return subDict;
+-(NSDictionary*)methodDictForSourceFiles
+{
+    [self compileAllSourceFiles];
+    return [self.interpreter externalScriptDict];
+}
+
+-(void)writeToStore:(id <MPWStorage>)target
+{
+    [self methodDict];
+    [target mkdirAt:@""];
+    [target mkdirAt:@"Sources"];
+    if ( self.saveSource ) {
+        [[self.interpreter methodStore] fileoutToStore:[target relativeStoreAt:@"Sources"]];
+    }
+    [target mkdirAt:@"Resources"];
+    id <MPWStorage> resourceTarget=[target relativeStoreAt:@"Resources"];
+    target[@"Info.json"] = [self storeForSubDir:@"."][@"Info.json"];
+    NSArray *children=[[self resources] childrenOfReference:@""];
+    id <MPWStorage> resourceSource=[self resources];
+    for ( id child in children ) {
+        resourceTarget[child] = resourceSource[child];
+    }
+}
+
+
+
+-(void)save
+{
+    NSError *outError=nil;
+    [self.cachedResources flush];
+    NSFileManager *fm=[NSFileManager defaultManager];
+    [fm createDirectoryAtURL:self.url withIntermediateDirectories:YES attributes:nil error:&outError];
+    if ( self.saveSource) {
+        NSURL *sourcesDir=[NSURL URLWithString:@"Sources" relativeToURL:self.url];
+        [fm createDirectoryAtURL:sourcesDir withIntermediateDirectories:YES attributes:nil error:&outError];
+        [[self.interpreter methodStore] fileoutToStore:self.sourceDir];
+    }
 }
 
 @end
@@ -170,7 +253,6 @@ CONVENIENCEANDINIT( bundle, WithPath:(NSString*)newPath )
 {
     STBundle *bundle=[self _testBundle];
     NSArray<NSString*> *names=[bundle sourceNames];
-    NSLog(@"names: %@",names);
     INTEXPECT(names.count, 2, @"number of source files");
     NSData *s1=[bundle sourceDir][names[0]];
     IDEXPECT(names[0], @"STBundleLoadedTestClass1.st", @"what is it?");

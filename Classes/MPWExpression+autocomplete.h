@@ -6,15 +6,15 @@
 //
 //
 
-#import <ObjectiveSmalltalk/MPWExpression.h>
+#import <ObjectiveSmalltalk/STExpression.h>
 
-@class MPWEvaluator;
-
-
-
-@interface MPWExpression (autocomplete)
+@class STEvaluator;
 
 
--(NSArray*)completionsForString:(NSString*)s withEvaluator:(MPWEvaluator*)evaluator resultName:(NSString **)resultName;
+
+@interface STExpression (autocomplete)
+
+
+-(NSArray*)completionsForString:(NSString*)s withEvaluator:(STEvaluator*)evaluator resultName:(NSString **)resultName;
 
 @end

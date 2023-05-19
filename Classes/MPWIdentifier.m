@@ -7,7 +7,7 @@
 //
 
 #import "MPWIdentifier.h"
-#import "MPWEvaluator.h"
+#import "STEvaluator.h"
 #import "MPWScheme.h"
 
 @implementation MPWIdentifier
@@ -99,6 +99,7 @@
 -evaluateIn:aContext
 {
     MPWScheme *evaluatedScheme = [aContext schemeForName:[self schemeName]];
+//    NSLog(@"did get scheme (%@) from context %p/%@: schmes: %p evaluated: %@",[self schemeName],aContext,[aContext class],[aContext schemes],evaluatedScheme);
     if (!evaluatedScheme) {
         NSLog(@"%@ not found in aContext schemes: %@",[self schemeName],[aContext schemes]);
         [NSException raise:@"unknownscheme" format:@"scheme with name '%@' not found",[self schemeName]];

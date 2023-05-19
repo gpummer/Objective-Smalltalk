@@ -50,6 +50,15 @@ CONVENIENCEANDINIT(getter, WithPropertyPathDefinitions:newPaths)
     return @"at:aReference";
 }
 
+-(void)setContext:(id)newVar
+{
+    [super setContext:newVar];
+    for ( MPWPropertyPathDefinition *p in self.propertyPathDefs) {
+        [p.get setContext:newVar];
+        [p.set setContext:newVar];
+    }
+}
+
 -(void)dealloc
 {
     [_propertyPathDefs release];
@@ -59,6 +68,11 @@ CONVENIENCEANDINIT(getter, WithPropertyPathDefinitions:newPaths)
 -(NSString*)script
 {
     return @" 'property path'. ";
+}
+
+-(BOOL)isPropertyPathDefs
+{
+    return YES;
 }
 
 @end

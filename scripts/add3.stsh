@@ -1,3 +1,0 @@
-#!/usr/local/bin/stsh
-#-addToThree:<int>arg
-arg+3.

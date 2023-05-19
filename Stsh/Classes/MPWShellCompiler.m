@@ -17,9 +17,11 @@
 #import "MPWEnvScheme.h"
 #import <MPWFoundation/MPWNeXTPListWriter.h>
 #import "MPWAbstractShellCommand.h"
-#import "MPWStsh.h"
+#import "STShell.h"
 #import "MPWShellPrinter.h"
 #import <MPWFoundation/MPWFDStreamSource.h>
+#import "MPWCommandStore.h"
+#import <ObjectiveSmalltalk/MPWSchemeScheme.h>
 
 @implementation MPWShellCompiler
 
@@ -73,6 +75,13 @@
 	}
 }
 
+-(MPWSchemeScheme*)createSchemes
+{
+    MPWSchemeScheme *schemes=[super createSchemes];
+    [schemes setSchemeHandler:[MPWCommandStore store] forSchemeName:@"sh"];
+    return schemes;
+}
+
 -init
 {
 	self=[super init];
@@ -94,7 +103,7 @@
 
 -executeShellExpression:compiledExpression
 {
-    return [compiledExpression executeInShell:self];
+    return [compiledExpression evaluateIn:self];
 }
 
 @end

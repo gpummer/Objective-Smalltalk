@@ -10,11 +10,17 @@
 #import "MPWBlockContext.h"
 #import <MPWFoundation/NSNil.h>
 #import "MPWIdentifier.h"
+#import "MPWStatementList.h"
+#import "MPWScriptedMethod.h"
 
 @implementation MPWBlockExpression
+{
+    NSArray *capturedVariables;
+}
 
 idAccessor( statements, setStatements )
 idAccessor( declaredArguments, setDeclaredArguments )
+lazyAccessor(NSArray *, capturedVariables, setCapturedVariables, computeCapturedVariables )
 
 -initWithStatements:newStatements arguments:newArgNames
 {
@@ -22,6 +28,15 @@ idAccessor( declaredArguments, setDeclaredArguments )
 	[self setStatements:newStatements];
 	[self setDeclaredArguments:newArgNames];
 	return self;
+}
+
+-statementArray
+{
+    id actualStatements = [self statements];
+    while ( [actualStatements isKindOfClass:[MPWStatementList class]]) {
+        actualStatements=[actualStatements statements];
+    }
+    return actualStatements;
 }
 
 +blockWithStatements:newStatements arguments:newArgNames
@@ -43,6 +58,8 @@ idAccessor( declaredArguments, setDeclaredArguments )
 {
 	[statements addToVariablesRead:variablesRead];
 }
+
+
 
 -(NSArray*)implicitUsedArguments
 {
@@ -79,6 +96,45 @@ idAccessor( declaredArguments, setDeclaredArguments )
     return arguments;
 }
 
+-(void)accumulateBlocks:(NSMutableArray*)blocks
+{
+    for ( id statement in [self statementArray] ) {
+        [statement accumulateBlocks:blocks];
+    }
+    [blocks addObject:self];
+}
+
+-(NSArray*)capturedVariablesFromMethod:(MPWScriptedMethod*)method
+{
+    MPWStatementList *s=[self statements];
+    NSMutableSet *variablesReferencedInBlock=[NSMutableSet set];
+    [s addToVariablesRead:variablesReferencedInBlock];
+    [s addToVariablesWritten:variablesReferencedInBlock];
+    
+    
+    return [variablesReferencedInBlock allObjects];
+}
+
+-(NSArray*)computeCapturedVariables
+{
+    NSAssert( self.method , @"need method to compute captures");
+    return [self capturedVariablesFromMethod:self.method];
+}
+
+-(int)numberOfCaptures
+{
+    return self.method ? (int)self.capturedVariables.count : 0;
+}
+
+-(bool)hasCaptures
+{
+    return self.numberOfCaptures > 0;
+}
+
+-(bool)needsToBeOnStack
+{
+    return self.hasCaptures;
+}
 
 -(NSString*)description
 {
@@ -90,7 +146,65 @@ idAccessor( declaredArguments, setDeclaredArguments )
 {
 	[statements release];
 	[declaredArguments release];
+    [capturedVariables release];
+    [_capturedVariableOffets release];
+    [_blockFunctionSymbol release];
+    [_blockDescriptorSymbol release];
 	[super dealloc];
 }
 
 @end
+
+#import "STCompiler.h"
+#import "MPWClassDefinition.h"
+
+
+
+@implementation MPWBlockExpression(testing)
+
++(MPWClassDefinition*)_classDefinitionFor:(NSString*)code
+{
+    STCompiler *compiler = [STCompiler compiler];
+    MPWClassDefinition *theClass = [compiler compile:code];
+    return theClass;
+}
+
++(void)testComputeBlockCaptures
+{
+    
+    MPWClassDefinition *theClass = [self _classDefinitionFor:@"class __STTestBlockCaptureComputation1 {  -main:args {  var a. a := 10. { a - 10. } value. } }"];
+    MPWScriptedMethod *method=theClass.methods.firstObject;
+    EXPECTNOTNIL( method, @"got a method");
+    NSArray *blocks = method.blocks;
+    INTEXPECT(blocks.count, 1, @"numbr of blocks");
+    MPWBlockExpression *block = blocks.firstObject;
+    NSArray *captured=[block capturedVariablesFromMethod:method];
+    INTEXPECT( captured.count, 1, @"number of captures");
+    IDEXPECT( [captured.firstObject name], @"a", @"name of capture");
+}
+
++(void)testIsOnStack
+{
+    MPWClassDefinition *theClass = [self _classDefinitionFor:@"class __STTestBlockCaptureComputation1 {  -first {  { 10. } value. }  -second:a { { a -10. } value. } }"];
+    INTEXPECT(theClass.methods.count,2,@"number of methods");
+    MPWScriptedMethod *first=theClass.methods.firstObject;
+    MPWScriptedMethod *second=theClass.methods.lastObject;
+    MPWBlockExpression *noCaptureBlock = first.blocks.firstObject;
+    MPWBlockExpression *captureBlock = second.blocks.firstObject;
+    EXPECTFALSE( noCaptureBlock.hasCaptures, @"first block has no captures");
+    EXPECTFALSE( noCaptureBlock.needsToBeOnStack, @"first block doesn't need to be on stack");
+    EXPECTTRUE( captureBlock.hasCaptures, @"2nd block has  captures");
+    EXPECTTRUE( captureBlock.needsToBeOnStack, @"2nd block needs to be on stack");
+
+}
+
++testSelectors
+{
+    return @[
+        @"testComputeBlockCaptures",
+        @"testIsOnStack",
+    ];
+}
+
+@end
+

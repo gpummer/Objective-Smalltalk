@@ -19,8 +19,8 @@
     MPWMessageExpression *setter;
 }
 
-lazyAccessor(MPWMessageExpression, getter, setGetter, computeGetter)
-lazyAccessor(MPWMessageExpression, setter, setSetter, computeSetter)
+lazyAccessor(MPWMessageExpression*, getter, setGetter, computeGetter)
+lazyAccessor(MPWMessageExpression*, setter, setSetter, computeSetter)
 
 -(MPWMessageExpression*)computeGetter
 {
@@ -51,6 +51,12 @@ lazyAccessor(MPWMessageExpression, setter, setSetter, computeSetter)
 -(id)evaluateIn:(id)aContext
 {
     return [[self getter] evaluateIn:aContext];
+}
+
+-(void)addToVariablesRead:(NSMutableSet *)variableList
+{
+    [self.receiver addToVariablesRead:variableList];
+    [self.subscript addToVariablesRead:variableList];
 }
 
 -(void)dealloc

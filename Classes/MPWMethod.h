@@ -6,17 +6,17 @@
 //  Copyright 2005 Marcel Weiher. All rights reserved.
 //
 
-#import <ObjectiveSmalltalk/MPWExpression.h>
+#import <ObjectiveSmalltalk/STExpression.h>
 
 @class MPWMethodHeader;
 
-@interface MPWMethod : MPWExpression {
+@interface MPWMethod : STExpression {
 	MPWMethodHeader*	methodHeader;
 	id					context;
 	id					methodType;
 }
 
-objectAccessor_h( MPWMethodHeader, methodHeader, setMethodHeader )
+objectAccessor_h(MPWMethodHeader*, methodHeader, setMethodHeader )
 idAccessor_h( context, setContext )
 idAccessor_h( methodType, setMethodType )
 

@@ -1,0 +1,9 @@
+#!env stsh
+framework:SchemeFUSE load.
+
+scheme:txt := #MPWExtensionMapper{ #extension: 'txt' , #source: scheme:env  }.
+fs := scheme:txt mountAt: ref:/Volumes/SchemeFS.
+
+shell runInteractiveLoop
+
+fs unmount.

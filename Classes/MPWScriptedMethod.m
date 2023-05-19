@@ -7,11 +7,12 @@
 //
 
 #import "MPWScriptedMethod.h"
-#import "MPWEvaluator.h"
+#import "STEvaluator.h"
 #import "STCompiler.h"
 #import "MPWMethodHeader.h"
 #import "MPWVarScheme.h"
 #import "MPWSchemeScheme.h"
+#import "MPWBlockExpression.h"
 
 @interface NSObject(MethodServeraddException)
 
@@ -21,10 +22,13 @@
 
 
 @implementation MPWScriptedMethod
+{
+    NSArray <MPWBlockExpression*>* blocks;
+}
 
 
-objectAccessor( MPWExpression, methodBody, setMethodBody )
-objectAccessor( NSArray, localVars, setLocalVars )
+objectAccessor(STExpression*, methodBody, setMethodBody )
+lazyAccessor(NSArray*, localVars, setLocalVars, computeLocalVars )
 idAccessor( script, _setScript )
 //idAccessor( _contextClass, setContextClass )
 
@@ -34,6 +38,25 @@ idAccessor( script, _setScript )
 //    NSLog(@"setScript: '%@'",newScript);
 	[self _setScript:newScript];
 }
+
+-computeLocalVars
+{
+    NSMutableArray *localVars=[NSMutableArray array];
+    [self.methodBody accumulateLocalVars:localVars];
+    return localVars;
+}
+
+-(NSArray <MPWBlockExpression*>*)findBlocks
+{
+    NSMutableArray *blocks=[NSMutableArray array];
+    [self.methodBody accumulateBlocks:blocks];
+    for ( MPWBlockExpression *block in blocks ) {
+        block.method = self;
+    }
+    return blocks;
+}
+
+lazyAccessor( NSArray <MPWBlockExpression*>* , blocks, _setBlocks, findBlocks)
 
 
 -compiledScript
@@ -53,7 +76,7 @@ idAccessor( script, _setScript )
 {
 	id localContextClass=[[self context] class];
 	if ( !localContextClass) {
-		localContextClass=[MPWEvaluator class];
+		localContextClass=[STEvaluator class];
 	}
 	return localContextClass;
 }
@@ -68,13 +91,14 @@ idAccessor( script, _setScript )
 
 //    NSLog(@"==== freshExecutionContextForRealLocalVars ===");
 
-	MPWEvaluator *evaluator = [[[STCompiler alloc] initWithParent:nil] autorelease];
+	STEvaluator *evaluator = [[[STCompiler alloc] initWithParent:nil] autorelease];
 //    if ( self.classOfMethod == nil) {
 //        [NSException raise:@"nilcontextclass" format:@"classOfMethod is nil in scripted method"];
 //    }
     [evaluator setContextClass:self.classOfMethod];
 //    NSLog(@"compiled-in schemes: %@",[[self compiledInExecutionContext] schemes]);
     MPWSchemeScheme *newSchemes=[[[self compiledInExecutionContext] schemes] copy];
+    [newSchemes setSchemeHandler:newSchemes forSchemeName:@"scheme"];
     MPWVarScheme *newVarScheme=[MPWVarScheme store];
     [newVarScheme setContext:evaluator];
     [newSchemes setSchemeHandler:newVarScheme forSchemeName:@"var"];
@@ -120,20 +144,26 @@ idAccessor( script, _setScript )
 -evaluateOnObject:target parameters:(NSArray*)parameters
 {
 	id returnVal=nil;
-	MPWEvaluator* executionContext = [self executionContext];
-    [executionContext bindValue:self toVariableNamed:@"self"];
+    id compiledMethod = [self compiledScript];
+	STEvaluator* executionContext = [self executionContext];
+//    NSLog(@"compiledExecutionContext: %@ schemes: %@",[self compiledInExecutionContext],[[self compiledInExecutionContext] schemes]);
+    [executionContext bindValue:self toVariableNamed:@"thisMethod"];
+    [executionContext bindValue:executionContext toVariableNamed:@"thisContext"];
     [[executionContext schemes] setSchemeHandler:[MPWPropertyStore storeWithObject:target] forSchemeName:@"this"];
     if ( ![[[self methodHeader] methodName] isEqual:@"schemeNames"]) {
+//        NSLog(@"for %@, getting schemeNames: %@",[[self methodHeader] methodName],[target schemeNames]);
         for ( NSString *schemeName in [target schemeNames]) {
+//            NSLog(@"install: %@",schemeName);
             id <MPWStorage> store=[target valueForKey:schemeName];
+//            NSLog(@"install scheme: %@ in executionContext %p schemes: %p",store,executionContext,[executionContext schemes]);
             if ( store ) {
                 [[executionContext schemes] setSchemeHandler:store forSchemeName:schemeName];
             }
         }
     }
+//    NSLog(@"context %p/%@ schemes: %@",executionContext,[executionContext class],[executionContext schemes]);
 //    NSLog(@"evalute scripted method %@",[self header]);
 //    NSLog(@"methodBody %@",[self methodBody]);
-	id compiledMethod = [self compiledScript];
 //	NSLog(@"will evaluate scripted method %@ with context %p",[self methodHeader],executionContext);
     @autoreleasepool {
 
@@ -142,14 +172,11 @@ idAccessor( script, _setScript )
     } @catch (id exception) {
 //        NSLog(@"exception evaluating scripted method: %@",[self methodHeader]);
         id newException = [self handleException:exception target:target];
-#if 1
         NSLog(@"exception: %@ at %@",newException,[newException combinedStackTrace]);
         Class c=NSClassFromString(@"MethodServer");
         [c addException:newException];
         NSLog(@"added exception to %@",c);
-#else
         @throw newException;
-#endif
     }
         [returnVal retain];
 //	NSLog(@"did evaluate scripted method %@ with context %p",[self methodHeader],executionContext);
@@ -188,7 +215,7 @@ idAccessor( script, _setScript )
 
 -(void)dealloc 
 {
-	[localVars release];
+    [localVars release];
 	[methodBody release];
 	[script release];
 	[super dealloc];
@@ -211,6 +238,7 @@ idAccessor( script, _setScript )
 
 @end
 
+#import "MPWClassDefinition.h"
 
 @implementation MPWScriptedMethod(testing)
 
@@ -299,12 +327,22 @@ idAccessor( script, _setScript )
     IDEXPECT( [tester script] , @"some script text",@"property via self: property-scheme");
 }
 
++(void)testComputeLocalVars
+{
+    STCompiler *compiler=[STCompiler compiler];
+    MPWClassDefinition *classDef = [compiler compile:@"class TestClass { -<void>setText:someText { var a. var b. 3. } }" ];
+    MPWScriptedMethod *method=classDef.methods.firstObject;
+    NSArray *localVarNames = [method localVars];
+    INTEXPECT(localVarNames.count, 2, @"number of local vars");
+}
+
 +testSelectors
 {
 	return [NSArray arrayWithObjects:
             @"testLookupOfNilVariableInMethodWorks",
             @"testThisSchemeReadsObject",
             @"testThisSchemeWritesObject",
+            @"testComputeLocalVars",
 //            @"testSimpleBacktrace",                       // FIXME:  exceptions are currently swallowed
 //            @"testNestedBacktrace",
 //            @"testCombinedScriptedAndNativeBacktrace",
@@ -316,9 +354,9 @@ idAccessor( script, _setScript )
 
 @implementation NSException(scriptStackTrace)
 
-dictAccessor(NSMutableArray, scriptStackTrace, setScriptStackTrace, (NSMutableDictionary*)[self userInfo])
+dictAccessor(NSMutableArray*, scriptStackTrace, setScriptStackTrace, (NSMutableDictionary*)[self userInfo])
 
-dictAccessor(NSMutableArray, combinedStackTrace, setCombinedStackTrace, (NSMutableDictionary*)[self userInfo])
+dictAccessor(NSMutableArray*, combinedStackTrace, setCombinedStackTrace, (NSMutableDictionary*)[self userInfo])
 
 -(void)cullTrace:(NSMutableArray*)trace replacingOriginal:original withFrame:frame
 {

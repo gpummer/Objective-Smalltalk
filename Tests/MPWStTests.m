@@ -7,7 +7,7 @@
 //
 
 #import "MPWStTests.h"
-#import <ObjectiveSmalltalk/MPWExpression.h>
+#import <ObjectiveSmalltalk/STExpression.h>
 #import <ObjectiveSmalltalk/MPWAssignmentExpression.h>
 #import <ObjectiveSmalltalk/MPWIdentifierExpression.h>
 #import <ObjectiveSmalltalk/MPWAbstractInterpretedMethod.h>
@@ -31,6 +31,9 @@
 #import "STObjectTemplate.h"
 #import "MPWLiteralDictionaryExpression.h"
 #import "STTypeDescriptor.h"
+#import "MPWStTests.h"
+
+
 @interface NSString(methodsDynamicallyAddedDuringTesting)
 
 -lengthMultipliedBy:aNumber;
@@ -59,7 +62,7 @@
 {
 	id result=nil;
 	NS_DURING
-    result = (MPWExpression*)[self evaluate:expr];
+    result = (STExpression*)[self evaluate:expr];
     result = [result stringValue];
     expected=[expected stringValue];
 	NS_HANDLER
@@ -139,12 +142,12 @@
 
 +(void)collectArrayLiteral
 {
-    TESTEXPR(@"#(1, 2, 3) collect + 3" ,([NSMutableArray arrayWithObjects:@"4",@"5",@"6",nil]));
+    TESTEXPR(@"[1, 2, 3] collect + 3" ,([NSMutableArray arrayWithObjects:@"4",@"5",@"6",nil]));
 }
 
 +(void)collectTwoArrayLiterals
 {
-    [self testexpr:@"#(1, 2, 3) collect + #(1, 2, 3) each" expected:[NSMutableArray arrayWithObjects:@"2",@"4",@"6",nil]];
+    [self testexpr:@"[1, 2, 3] collect + [1, 2, 3] each" expected:[NSMutableArray arrayWithObjects:@"2",@"4",@"6",nil]];
 }
 
 +(void)testLocalVariables
@@ -155,7 +158,7 @@
 	id evaluator = [[[self alloc] init] autorelease];
 	id result;
 	[evaluator bindValue:a toVariableNamed:@"a"];
-	result = [(MPWExpression*)[evaluator evaluateScriptString:expr] stringValue];
+	result = [(STExpression*)[evaluator evaluateScriptString:expr] stringValue];
     IDEXPECT( result, expected, @"send uppercaseString");
 	
 }
@@ -1403,6 +1406,27 @@
     IDEXPECT( [compiler evaluateScriptString:@"a supersender."],@"base",@"super send - if sent to self then result will be 'sub' instead");
 }
 
+
++(void)testArraySubscriptExpressionAsArg
+{
+    STCompiler *compiler=[STCompiler compiler];
+    @try {
+        MPWMessageExpression* compiled = [compiler compile:@"2 + a[1]"];
+    } @catch ( NSException *e) {
+        IDEXPECT(e,@"No error",@"shouldn't be an error");
+    }
+}
+
++(void)testChainedSubscriptExpressionsCompile
+{
+    STCompiler *compiler=[STCompiler compiler];
+    @try {
+        MPWMessageExpression* compiled = [compiler compile:@"2 + a[1][2]"];
+    } @catch ( NSException *e) {
+        IDEXPECT(e,@"No error",@"shouldn't be an error");
+    }
+}
+
 +(NSArray*)testSelectors
 {
     return @[
@@ -1556,6 +1580,8 @@
         @"testConnectStreamToBinding",
         @"testMappingStoreCanReferToSourceAsScheme",
         @"testSuperSend",
+        @"testArraySubscriptExpressionAsArg",
+        @"testChainedSubscriptExpressionsCompile",
 #endif
         @"testBugTwoRefsCreatedTogetherShouldHaveDifferentPaths",
         ];

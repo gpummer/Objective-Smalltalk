@@ -1,3 +1,0 @@
-#!/usr/local/bin/stsh
-#-<void>from:<int>from to:<int>to
-stdout do println:(from to: to ) each

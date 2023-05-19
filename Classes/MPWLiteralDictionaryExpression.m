@@ -7,7 +7,7 @@
 //
 
 #import "MPWLiteralDictionaryExpression.h"
-#import "MPWEvaluator.h"
+#import "STEvaluator.h"
 
 @interface MPWLiteralDictionaryExpression ()
 
@@ -39,7 +39,7 @@
     self.literalClassName=name;
 }
 
--(NSDictionary*)dictionaryForLiteralInContext:(MPWEvaluator*)aContext class:(Class)dictClass
+-(NSDictionary*)dictionaryForLiteralInContext:(STEvaluator*)aContext class:(Class)dictClass
 {
 #define MAXSTACK 50
     id stackKeys[MAXSTACK];
@@ -62,6 +62,7 @@
         values[i]=[values[i] evaluateIn:aContext];
         if ( values[i]==nil) {
             values[i]=[NSNull null];
+            // FIXME:  should this really raise?
             [NSException raise:@"nil" format:@"in literal expression class %@ key:%@ value:%@",self.literalClassName,keys[i],values[i]];
         }
     }

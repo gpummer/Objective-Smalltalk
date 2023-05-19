@@ -13,7 +13,7 @@
 
 @implementation MPWStName
 
-objectAccessor(NSString, realString, setRealString)
+objectAccessor(NSString*, realString, setRealString)
 
 -initWithString:(NSString*)newString
 {
@@ -407,21 +407,48 @@ static inline int decodeUTF8FirstByte( int ch, int *numChars)
     const char *cur=pos;
     id string;
 //	int numPeriods=0;
-    while ( SCANINBOUNDS(cur) && isdigit(*cur)) {
-        cur++;
+    if ( SCANINBOUNDS(cur+1) && cur[0]=='0' && tolower(cur[1])=='x') {
+        cur+=2;
+        long value=0;
+        while ( SCANINBOUNDS(cur) && isxdigit(*cur)) {
+            value*=16;
+            int digit = toupper(*cur)-'0';
+            if ( digit > 10 ) {
+                digit -= ('A' - '9'  - 1);
+            }
+            value+=digit;
+            
+            cur++;
+        }
+        pos=cur;
+        return [self createInt:value];
+    } if ( SCANINBOUNDS(cur+1) && cur[0]=='0' && tolower(cur[1])=='b') {
+        cur+=2;
+        long value=0;
+        while ( SCANINBOUNDS(cur) && (*cur=='1' || *cur=='0')) {
+            value<<=1;
+            value+=*cur - '0';
+            cur++;
+        }
+        pos=cur;
+        return [self createInt:value];
+    } else {
+        while ( SCANINBOUNDS(cur) && isdigit(*cur)) {
+            cur++;
+        }
+        if (*cur=='.' && SCANINBOUNDS(cur+1) && isdigit(cur[1])) {
+            cur++;
+            while ( SCANINBOUNDS(cur) && isdigit(*cur) ) {
+                cur++;
+            }
+        }
     }
-	if (*cur=='.' && SCANINBOUNDS(cur+1) && isdigit(cur[1])) {
-		cur++;
-		while ( SCANINBOUNDS(cur) && isdigit(*cur) ) {
-			cur++;
-		}
-	}
     string=[self makeText:cur-pos];
 	if ( !noNumbers ) {
 		if ( [string rangeOfString:@"."].length==1 ) {
 			return [self createDouble:[string doubleValue]];
 		} else {
-			return [self createInt:[string longValue]];
+            return [self createInt:[string longValue]];
 		}
 	} else {
 		return string;

@@ -26,9 +26,9 @@
 #import <ObjectiveSmalltalk/MPWDefaultsScheme.h>
 #import <ObjectiveSmalltalk/MPWEnvScheme.h>
 #import <ObjectiveSmalltalk/MPWEvaluable.h>
-#import <ObjectiveSmalltalk/MPWEvaluator.h>
+#import <ObjectiveSmalltalk/STEvaluator.h>
 #import <ObjectiveSmalltalk/MPWExpression+autocomplete.h>
-#import <ObjectiveSmalltalk/MPWExpression.h>
+#import <ObjectiveSmalltalk/STExpression.h>
 #import <ObjectiveSmalltalk/MPWFileSchemeResolver.h>
 #import <ObjectiveSmalltalk/MPWFilterDefinition.h>
 #import <ObjectiveSmalltalk/MPWFrameworkScheme.h>
@@ -56,6 +56,7 @@
 #import <ObjectiveSmalltalk/MPWSpotlightScheme.h>
 #import <ObjectiveSmalltalk/STCompiler.h>
 #import <ObjectiveSmalltalk/MPWTreeNodeScheme.h>
+#import <ObjectiveSmalltalk/MPWStatementList.h>
 //#import <ObjectiveSmalltalk/MPWURLBinding.h>
 //#import <ObjectiveSmalltalk/MPWURLSchemeResolver.h>
 #import <ObjectiveSmalltalk/MPWVARBinding.h>
@@ -63,6 +64,8 @@
 #import <ObjectiveSmalltalk/NSObjectScripting.h>
 #import <ObjectiveSmalltalk/STBundle.h>
 #import <ObjectiveSmalltalk/STVariableDefinition.h>
+#import <ObjectiveSmalltalk/ViewBuilderPreviewNotification.h>
+#import <ObjectiveSmalltalk/STProgram.h>
 
 
 #endif /* ObjectiveSmalltalk_h */

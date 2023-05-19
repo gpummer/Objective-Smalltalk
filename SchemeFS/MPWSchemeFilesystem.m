@@ -12,17 +12,33 @@
 #import <ObjectiveSmalltalk/MPWFileSchemeResolver.h>
 #import <MPWFoundation/MPWFoundation.h>
 
-static NSString *helloStr = @"Hello Brave New World!\n";
 static NSString *helloPath = @"/hello.txt";
+
+@interface MPWSchemeFilesystem()
+
+@property (nonatomic,strong) GMUserFileSystem *filesystem;
+
+@end
+
+
+@implementation MPWBinding(childNames)
+
+-childNames
+{
+    return [[[[[self children] collect] reference] collect] path];
+}
+
+@end
+
 
 @implementation MPWSchemeFilesystem
 
-objectAccessor(MPWScheme, scheme, setScheme)
 
 -(id)initWithScheme:newScheme
 {
     self = [super init];
     [self setScheme:newScheme];
+    self.filesystem = [[[GMUserFileSystem alloc] initWithDelegate:self isThreadSafe:NO] autorelease];
     return self;
 }
 
@@ -33,18 +49,32 @@ objectAccessor(MPWScheme, scheme, setScheme)
 }
 
 - (NSArray *)contentsOfDirectoryAtPath:(NSString *)path error:(NSError **)error {
-    NSLog(@"get directory: %@",path);
-    //    return [NSArray arrayWithObject:@"hello.txt"];
-    id v = [[[self scheme] bindingForName:path inContext:nil] childNames];
-    NSLog(@"children: %@",v);
-    NSLog(@"class %@, value: %@",[v class],v);
-    return v;
+    while ( path.length > 1 && [path hasPrefix:@"/"]) {
+        path=[path substringFromIndex:1];
+    }
+    NSLog(@"dir: %@",path);
+    id names = nil;
+    @try {
+        names = [[self scheme] childrenOfReference:path];
+        names = [[names collect] stringByReplacingOccurrencesOfString:@":" withString:@"_"];
+//        names = [[names collect] stringByReplacingOccurrencesOfString:@" " withString:@"_"];
+    } @catch (id e) {
+        
+    }
+    NSLog(@"dir contents: %@",names);
+    return names;
 }
 
 - (NSData *)contentsAtPath:(NSString *)path {
-    NSLog(@"get file: %@",path);
-//    return [@"hello world!" asData];
-   return  [[[[self scheme] bindingForName:path inContext:nil] value] asData];
+    while ( path.length > 1 && [path hasPrefix:@"/"]) {
+        path=[path substringFromIndex:1];
+    }
+    NSLog(@"contents of %@: '%@'",path,[[self scheme] at:path]);
+    @try {
+        return [[[self scheme] at:path] asData];
+    } @catch ( id e) {
+        return nil;
+    }
 }
 
 #pragma optional Custom Icon
@@ -53,22 +83,27 @@ objectAccessor(MPWScheme, scheme, setScheme)
 
 - (NSDictionary *)finderAttributesAtPath:(NSString *)path 
                                    error:(NSError **)error {
-    NSLog(@"get finder attributes: %@",path);
-    if ([path isEqualToString:helloPath]) {
-        NSNumber* finderFlags = [NSNumber numberWithLong:kHasCustomIcon];
-        return [NSDictionary dictionaryWithObject:finderFlags
-                                           forKey:kGMUserFileSystemFinderFlagsKey];
-    }
+//    if ([path isEqualToString:helloPath]) {
+//        NSNumber* finderFlags = [NSNumber numberWithLong:kHasCustomIcon];
+//        return [NSDictionary dictionaryWithObject:finderFlags
+//                                           forKey:kGMUserFileSystemFinderFlagsKey];
+//    }
     return nil;
 }
 
 - (NSDictionary *)attributesOfItemAtPath:(NSString *)path
                                 userData:(id)userData
                                    error:(NSError **)error {
-    id v = [[self scheme] bindingForName:path inContext:nil];
-    if ( [v hasChildren] ) {
+//    NSLog(@"attributesOfItemAtPath: %@",path);
+//    NSLog(@"binding: %@ hasChildren: %d",binding,[binding hasChildren]);
+    while ( path.length > 1 && [path hasPrefix:@"/"]) {
+        path=[path substringFromIndex:1];
+    }
+    if ( [[self scheme] hasChildren:path] ) {
+        NSLog(@"%@ is directory",path);
         return [NSDictionary dictionaryWithObject:NSFileTypeDirectory forKey:NSFileType];
     } else {
+        NSLog(@"%@ is file ",path);
         return  @{NSFileType: NSFileTypeRegular,
                   NSFilePosixPermissions: @(4*8*8)
                   } ;
@@ -79,13 +114,41 @@ objectAccessor(MPWScheme, scheme, setScheme)
 
 - (NSDictionary *)resourceAttributesAtPath:(NSString *)path
                                      error:(NSError **)error {
-    NSLog(@"get resource attrs: %@",path);
-    if ([path isEqualToString:helloPath]) {
-        NSString *file = [[NSBundle mainBundle] pathForResource:@"hellodoc" ofType:@"icns"];
-        return [NSDictionary dictionaryWithObject:[NSData dataWithContentsOfFile:file]
-                                           forKey:kGMUserFileSystemCustomIconDataKey];
-    }
+//        NSLog(@"get resource attrs: %@",path);
+//    if ([path isEqualToString:helloPath]) {
+//        NSString *file = [[NSBundle mainBundle] pathForResource:@"hellodoc" ofType:@"icns"];
+//        return [NSDictionary dictionaryWithObject:[NSData dataWithContentsOfFile:file]
+//                                           forKey:kGMUserFileSystemCustomIconDataKey];
+//    }
     return nil;
+}
+
+-(void)unmount {
+    [_filesystem unmount];
+}
+
+-(void)mountAt:(NSString*)mountPath
+{
+    [self.filesystem mountAtPath:[mountPath path] withOptions:@[@"direct_io"]];
+}
+
+-(void)dealloc
+{
+    [_filesystem release];
+    [_scheme release];
+    [super dealloc];
+}
+
+@end
+
+
+@implementation MPWAbstractStore(mounting)
+
+-(MPWSchemeFilesystem*)mountAt:(NSString*)mountPath
+{
+    MPWSchemeFilesystem *fs=[[[MPWSchemeFilesystem alloc] initWithScheme:self] autorelease];
+    [fs mountAt:mountPath];
+    return fs;
 }
 
 @end

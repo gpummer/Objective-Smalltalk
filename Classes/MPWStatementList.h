@@ -6,14 +6,14 @@
 //  Copyright 2004 Marcel Weiher. All rights reserved.
 //
 
-#import <ObjectiveSmalltalk/MPWExpression.h>
+#import <ObjectiveSmalltalk/STExpression.h>
 
 
-@interface MPWStatementList : MPWExpression {
+@interface MPWStatementList : STExpression {
 	id statements;
 }
 
-idAccessor_h( statements, setStatements )
+objectAccessor_h( NSMutableArray*, statements, setStatements )
 
 -(void)addStatement:aStatement;
 +statementList;

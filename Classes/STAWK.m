@@ -14,20 +14,44 @@
 -(instancetype)initWithTarget:(id)aTarget
 {
     self=[super initWithTarget:aTarget];
-    [self setSeparator:@" "];
+    [self setSeparator:@","];
     return self;
 }
 
 -(void)writeString:(NSString*)aString
 {
     NSArray *fields=[aString componentsSeparatedByString:self.separator];
-    [self.block valueWithObjects:fields];
+    NSMutableArray *whitespaceCoalescedFields=[NSMutableArray array];
+    NSString *last=nil;
+    for (NSString *field in fields) {
+        if ( field.length) {
+            [whitespaceCoalescedFields addObject:field];
+        }
+        last=field;
+    }
+    switch ( whitespaceCoalescedFields.count) {
+        case 0:
+            [self.block value];
+            break;
+        case 1:
+            [self.block value:whitespaceCoalescedFields[0]];
+            break;
+        default:
+            //  -valueWithObjects: isn't implemented on NSBlock and will fail for now if compiled
+            [self.block valueWithObjects:whitespaceCoalescedFields];
+            break;
+    }
+}
+
+-(void)writeData:(NSData *)d
+{
+    [self writeString:[d stringValue]];
 }
 
 @end
 
 
-@implementation MPWFileBinding(awk)
+@implementation MPWStreamableBinding(awk)
 
 -(void)withSeparator:(NSString*)separator awk:block
 {
@@ -62,6 +86,7 @@
     STCompiler *compiler=[STCompiler compiler];
     MPWByteStream *result=[MPWByteStream stream];
     STAWK *s=[STAWK stream];
+    [s setSeparator:@" "];
     [compiler bindValue:s toVariableNamed:@"awk"];
     [compiler bindValue:result toVariableNamed:@"myout"];
     [compiler evaluateScriptString:@"awk setBlock:{ :arg1 :arg2 :arg3 | myout print:\"Arg1: {arg1} Arg3: {arg3}\". }. "];
